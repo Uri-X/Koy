@@ -1,0 +1,182 @@
+// Loyalty Platform — Prisma schema
+// Mirrors PRD Section 7 (Data Model) and Section 3 (Multi-Industry architecture notes)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Industry {
+  HORECA
+  RETAIL
+  WELLNESS
+  SERVICES
+  OTHER
+}
+
+enum RewardType {
+  FREE_ITEM
+  DISCOUNT_PERCENT
+  DISCOUNT_FIXED
+  CASH_VALUE
+  CUSTOM
+}
+
+enum EarningRuleType {
+  SPEND_THRESHOLD // "spend >= X" -> N stars (v1 implementation)
+  VISIT_COUNT     // "every Nth visit" -> star (future)
+  CUSTOM          // escape hatch for bespoke logic (future)
+}
+
+enum RedemptionStatus {
+  PENDING
+  FULFILLED
+  CANCELLED
+}
+
+enum MerchantRole {
+  ADMIN
+  STAFF
+}
+
+// ---------------------------------------------------------------------------
+// Core models
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?  @unique
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships  MerchantMembership[]
+  transactions Transaction[]        @relation("CustomerTransactions")
+  redemptions  Redemption[]
+  staffRoles   MerchantStaff[]
+
+  @@map("users")
+}
+
+model Merchant {
+  id       String   @id @default(cuid())
+  name     String
+  industry Industry @default(OTHER)
+  logoUrl  String?
+  location String?
+
+  // Active/default reward config (v1 supports a single reward per merchant;
+  // multi-tier rewards are out of scope for v1 per PRD Section 8)
+  redemptionTarget Int        @default(10)
+  rewardDescription String    @default("Free item")
+  rewardType        RewardType @default(FREE_ITEM)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  earningRules EarningRule[]
+  memberships  MerchantMembership[]
+  transactions Transaction[]
+  redemptions  Redemption[]
+  staff        MerchantStaff[]
+
+  @@map("merchants")
+}
+
+// Pluggable earning rule. v1 only implements SPEND_THRESHOLD logic in the
+// service layer, but the shape supports adding VISIT_COUNT / CUSTOM later
+// without a schema migration — config holds rule-specific parameters.
+model EarningRule {
+  id         String          @id @default(cuid())
+  merchantId String
+  merchant   Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  type       EarningRuleType @default(SPEND_THRESHOLD)
+  // Example config for SPEND_THRESHOLD: { "thresholdAmount": 2500, "starsPerThreshold": 1, "currency": "KES" }
+  config     Json
+  isActive   Boolean         @default(true)
+
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([merchantId, isActive])
+  @@map("earning_rules")
+}
+
+// Per-merchant staff access (v1.1 per PRD, modeled now to avoid a later migration)
+model MerchantStaff {
+  id         String       @id @default(cuid())
+  merchantId String
+  merchant   Merchant     @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       MerchantRole @default(STAFF)
+
+  createdAt  DateTime     @default(now())
+
+  @@unique([merchantId, userId])
+  @@map("merchant_staff")
+}
+
+// Join table: a customer's relationship + running balance with one merchant.
+// Points are siloed per merchant in v1 (PRD Section 10, open decision —
+// revisit if pooled/network-wide points are approved later).
+model MerchantMembership {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  merchantId   String
+  merchant     Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  currentStars Int      @default(0)
+  lifetimeStars Int     @default(0)
+
+  joinedAt     DateTime @default(now())
+
+  @@unique([userId, merchantId])
+  @@map("merchant_memberships")
+}
+
+model Transaction {
+  id           String   @id @default(cuid())
+  merchantId   String
+  merchant     Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("CustomerTransactions", fields: [userId], references: [id], onDelete: Cascade)
+
+  amount       Decimal  @db.Decimal(12, 2)
+  starsAwarded Int      @default(0)
+  loggedBy     String?  // staff/admin user id who recorded it; null if self-service later
+
+  createdAt    DateTime @default(now())
+
+  @@index([merchantId, userId])
+  @@map("transactions")
+}
+
+model Redemption {
+  id                String            @id @default(cuid())
+  merchantId        String
+  merchant          Merchant          @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  starsUsed         Int
+  rewardDescription String
+  status            RedemptionStatus  @default(PENDING)
+
+  createdAt         DateTime          @default(now())
+  fulfilledAt       DateTime?
+
+  @@index([merchantId, userId])
+  @@map("redemptions")
+}
