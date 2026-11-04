@@ -20,14 +20,17 @@ export class MerchantsService {
         rewardDescription: dto.rewardDescription,
         rewardType: dto.rewardType,
         earningRules: {
-          create: {
-            type: EarningRuleType.SPEND_THRESHOLD,
-            config: {
-              thresholdAmount: dto.thresholdAmount,
-              starsPerThreshold: dto.starsPerThreshold ?? 1,
-              currency: dto.currency ?? "KES",
+          create: [
+            {
+              type: "SPEND_THRESHOLD",
+              thresholdAmount: dto.thresholdAmount, // 👈 Added to satisfy Prisma schema constraint
+              config: JSON.stringify({
+                thresholdAmount: dto.thresholdAmount,
+                starsPerThreshold: dto.starsPerThreshold,
+                currency: dto.currency,
+              }),
             },
-          },
+          ],
         },
       },
       include: { earningRules: true },

@@ -32,7 +32,8 @@ export class RedemptionsService {
           userId,
           starsUsed: merchant.redemptionTarget,
           rewardDescription: merchant.rewardDescription,
-          status: RedemptionStatus.PENDING,
+          status: "PENDING",
+          code: `RED-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
         },
       });
     });
@@ -45,7 +46,7 @@ export class RedemptionsService {
 
     return this.prisma.client.redemption.update({
       where: { id: redemptionId },
-      data: { status: RedemptionStatus.FULFILLED, fulfilledAt: new Date() },
+      data: { status: RedemptionStatus.COMPLETED, fulfilledAt: new Date() },
     });
   }
 

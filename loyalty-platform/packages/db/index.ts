@@ -14,3 +14,30 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 export * from "@prisma/client";
+
+// 👇 ADD THIS BLOCK TO EXPORT THE CODES YOUR API EXPECTS 👇
+export const Industry = {
+  RETAIL: 'RETAIL',
+  FOOD_BEVERAGE: 'FOOD_BEVERAGE',
+  OTHER: 'OTHER',
+} as const;
+export type Industry = typeof Industry[keyof typeof Industry];
+
+export const RewardType = {
+  CASHBACK: 'CASHBACK',
+  STARS: 'STARS',
+  FREE_ITEM: 'FREE_ITEM',
+} as const;
+export type RewardType = typeof RewardType[keyof typeof RewardType];
+
+export const RedemptionStatus = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+} as const;
+export type RedemptionStatus = typeof RedemptionStatus[keyof typeof RedemptionStatus];
+
+export const EarningRuleType = {
+  SPEND_THRESHOLD: 'SPEND_THRESHOLD',
+} as const;
+export type EarningRuleType = typeof EarningRuleType[keyof typeof EarningRuleType];

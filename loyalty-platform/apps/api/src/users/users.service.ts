@@ -6,7 +6,15 @@ export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   create(data: { name: string; phone?: string; email?: string }) {
-    return this.prisma.client.user.create({ data });
+    return this.prisma.client.user.create({ 
+  data: {
+    name: data.name,
+    phone: data.phone,
+    email: data.email,
+    memberCode: `MEM-${Math.random().toString(36).substring(2, 9).toUpperCase()}` // 👈 Add this line
+  } 
+});
+
   }
   // Signup step 2: join a merchant's loyalty program (PRD 5.3)
   async joinMerchant(userId: string, merchantId: string) {
